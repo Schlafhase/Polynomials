@@ -11,9 +11,10 @@ public class Polynomial
     public Polynomial(int degree, List<Complex> coefficients)
     {
         Degree = degree;
-        Coefficients = coefficients.Count == degree + 1 ?
-          coefficients :
-          throw new ArgumentException("Polynomial must have degree + 1 coefficients");
+        Coefficients =
+            coefficients.Count == degree + 1
+                ? coefficients
+                : throw new ArgumentException("Polynomial must have degree + 1 coefficients");
 
         if (Coefficients[Degree] == 0)
         {
@@ -24,19 +25,26 @@ public class Polynomial
     public Complex Evaluate(Complex x)
     {
         return Coefficients
-          .AsEnumerable()
-          .Reverse()
-          .Aggregate((result, coeff) => result * x + coeff);
+            .AsEnumerable()
+            .Reverse()
+            .Aggregate((result, coeff) => result * x + coeff);
     }
 
     public Polynomial Derivative =>
-      new Polynomial(Degree - 1, Coefficients.Slice(1, Coefficients.Count - 1).Select((c, i) => c * (i + 1)).ToList());
+        new Polynomial(
+            Degree - 1,
+            [.. Coefficients.Slice(1, Coefficients.Count - 1).Select((c, i) => c * (i + 1))]
+        );
 
     public (double upper, double lower) Bounds
     {
         get
         {
-            double upper = 1 + Coefficients.Select(c => (c / Coefficients[Coefficients.Count - 1]).Magnitude).Max();
+            double upper =
+                1
+                + Coefficients
+                    .Select(c => (c / Coefficients[Coefficients.Count - 1]).Magnitude)
+                    .Max();
             double lower = 1 / upper;
             return (upper, lower);
         }
@@ -45,15 +53,19 @@ public class Polynomial
     private List<Complex> fibonacciAnnulus(int n, double rMin, double rMax)
     {
         double goldenRatio = (1d + Math.Sqrt(5d)) / 2d;
-        return (from i in Enumerable.Range(0, n)
+        return
+        [
+            .. (
+                from i in Enumerable.Range(0, n)
                 let t = (double)i / n
                 let r = Math.Sqrt(t * (rMax * rMax - rMin * rMin) + rMin * rMin)
                 let theta = 2d * Math.PI * i / goldenRatio
-                select new Complex(r * Math.Cos(theta), r * Math.Sin(theta)))
-          .ToList();
+                select new Complex(r * Math.Cos(theta), r * Math.Sin(theta))
+            ),
+        ];
     }
 
-    public List<Complex> GetRootsAberth(int maxIterations = 100000, double threshold = 0.0000001)
+    public List<Complex> GetRootsAberth(int maxIterations = 100000, double threshold = 0.001)
     {
         (double upper, double lower) bounds = Bounds;
         List<Complex> roots = fibonacciAnnulus(Degree, bounds.lower, bounds.upper);
@@ -102,7 +114,7 @@ public class Polynomial
             Complex c = Coefficients[i];
             if (c != 0)
             {
-                sb.Insert(0, "(" + c.ToString() + ")x^" + i + "+ ");
+                _ = sb.Insert(0, "(" + c.ToString() + ")x^" + i + "+ ");
             }
         }
 
@@ -125,7 +137,7 @@ public class Polynomial
         List<Complex> choices = [new Complex(-1, 0), new Complex(1, 0)];
 
         return cartesian(Enumerable.Repeat(choices, n + 1))
-          .Select(coeffs => new Polynomial(n, coeffs.ToList()));
+            .Select(coeffs => new Polynomial(n, [.. coeffs]));
     }
 
     private static IEnumerable<IEnumerable<T>> cartesian<T>(IEnumerable<IEnumerable<T>> sequences)
@@ -134,9 +146,7 @@ public class Polynomial
 
         return sequences.Aggregate(
             emptyProduct,
-            (acc, seq) =>
-              from set in acc
-              from item in seq
-              select set.Concat(new[] { item }));
+            (acc, seq) => from set in acc from item in seq select set.Concat(new[] { item })
+        );
     }
 }
