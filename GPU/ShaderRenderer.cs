@@ -320,10 +320,10 @@ public class ShaderRenderer : IDisposable
         uint rootBuffer = createComplexListBuffer(roots);
         gl.ActiveTexture(TextureUnit.Texture1);
         gl.BindTexture(TextureTarget.TextureBuffer, rootBuffer);
-        gl.ActiveTexture(TextureUnit.Texture0);
 
         int rootLoc = gl.GetUniformLocation(shaderProgram, "roots");
         gl.Uniform1(rootLoc, 1);
+        gl.ActiveTexture(TextureUnit.Texture0);
         Console.WriteLine(
             $"Uniform locations: uResolution={resolutionLoc}, currentColour={currentColourLoc}"
         );
