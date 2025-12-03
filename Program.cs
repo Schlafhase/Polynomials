@@ -1,4 +1,5 @@
 ﻿using System.Numerics;
+using Polynomials.GPU;
 using ScottPlot;
 using SixLabors.ImageSharp;
 using SixLabors.ImageSharp.ColorSpaces;
@@ -11,27 +12,11 @@ namespace Polynomials;
 
 internal class Program
 {
+    private static string _shaderSource = File.ReadAllText("createImage.frag");
+
     public static void Main(string[] args)
     {
         createColouredImage(15, 2);
-        return;
-        List<Polynomial> littlewoods = Polynomial.LittlewoodUpTo(15);
-        List<Complex> roots = [];
-
-        foreach (var p in littlewoods)
-        {
-            roots.AddRange(p.GetRootsAberth());
-        }
-
-        Plot plot = new();
-
-        plot.Add.Markers(
-            roots.Select(r => r.Real).ToArray(),
-            roots.Select(r => r.Imaginary).ToArray(),
-            MarkerShape.FilledCircle,
-            2
-        );
-        plot.SavePng("plot.png", 1920, 1080);
     }
 
     private static void createColouredImage(int n, double scale)
@@ -40,7 +25,7 @@ internal class Program
         (int width, int height) HD = new(1920, 1080);
         (int width, int height) low = new(720, 480);
         (int width, int height) res = HD;
-        SixLabors.ImageSharp.Image img = new Image<Rgba32>(res.width, res.height);
+        SixLabors.ImageSharp.Image<Rgba32> img = new Image<Rgba32>(res.width, res.height);
         img.Mutate(x => x.Fill(SixLabors.ImageSharp.Color.Black));
 
         goto roots;
@@ -95,6 +80,8 @@ internal class Program
         }
 
         roots:
+        using ShaderRenderer renderer = new();
+        renderer.Initialise((uint)res.width, (uint)res.height, _shaderSource);
 
         for (int i = 1; i < n; i++)
         {
@@ -117,6 +104,8 @@ internal class Program
             Hsl col = new((float)((double)(i - 1) / (n - 1) * 360), 1, 0.5f);
             var rgb = ColorSpaceConverter.ToRgb(col);
 
+            img = renderer.RenderToImage(img, new Vector4(rgb.R, rgb.G, rgb.B, 1), roots);
+            // img.Mutate(ctx => ctx.DrawImage(shaded, 1f / n));
             // foreach (Complex root in roots)
             // {
             //     EllipsePolygon circle = new(
@@ -133,38 +122,39 @@ internal class Program
             //         )
             //     );
             // }
+            //
 
-            img.Mutate(ctx =>
-                ctx.ProcessPixelRowsAsVector4(
-                    (span, point) =>
-                    {
-                        for (int x = 0; x < span.Length; x++)
-                        {
-                            int actualX = point.X + x;
-                            int y = point.Y;
-
-                            // Modify the pixel based on coordinates
-                            // span[x] contains the RGBA values as Vector4 (values from 0.0 to 1.0)
-                            var pixel = span[x];
-                            var uvX =
-                                ((double)actualX / img.Height - 0.5 * img.Width / img.Height) * 2;
-                            var uvY = -((double)y / img.Height - 0.5) * 2;
-                            Complex c = new(uvX * scale, uvY * scale);
-                            double d = 50 * roots.Select(r => (c - r).Magnitude).Min();
-
-                            pixel.X += (float)(rgb.R / d / n);
-                            pixel.Y += (float)(rgb.G / d / n);
-                            pixel.Z += (float)(rgb.B / d / n);
-                            // pixel.X = rgb.R;
-                            // pixel.Y = rgb.G;
-                            // pixel.Z = rgb.B;
-                            pixel.W = 1.0f;
-
-                            span[x] = pixel;
-                        }
-                    }
-                )
-            );
+            // img.Mutate(ctx =>
+            //     ctx.ProcessPixelRowsAsVector4(
+            //         (span, point) =>
+            //         {
+            //             for (int x = 0; x < span.Length; x++)
+            //             {
+            //                 int actualX = point.X + x;
+            //                 int y = point.Y;
+            //
+            //                 // Modify the pixel based on coordinates
+            //                 // span[x] contains the RGBA values as Vector4 (values from 0.0 to 1.0)
+            //                 var pixel = span[x];
+            //                 var uvX =
+            //                     ((double)actualX / img.Height - 0.5 * img.Width / img.Height) * 2;
+            //                 var uvY = -((double)y / img.Height - 0.5) * 2;
+            //                 Complex c = new(uvX * scale, uvY * scale);
+            //                 double d = 50 * roots.Select(r => (c - r).Magnitude).Min();
+            //
+            //                 pixel.X += (float)(rgb.R / d / n);
+            //                 pixel.Y += (float)(rgb.G / d / n);
+            //                 pixel.Z += (float)(rgb.B / d / n);
+            //                 // pixel.X = rgb.R;
+            //                 // pixel.Y = rgb.G;
+            //                 // pixel.Z = rgb.B;
+            //                 pixel.W = 1.0f;
+            //
+            //                 span[x] = pixel;
+            //             }
+            //         }
+            //     )
+            // );
         }
         img.Save("out.png");
     }
