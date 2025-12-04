@@ -28,8 +28,8 @@ internal class Program
         SixLabors.ImageSharp.Image<Rgba32> img = new Image<Rgba32>(res.width, res.height);
         img.Mutate(x => x.Fill(SixLabors.ImageSharp.Color.Black));
 
-        using ShaderRenderer renderer = new();
-        renderer.Initialise((uint)res.width, (uint)res.height, _shaderSource);
+        using GLComputeRenderer renderer = new();
+        renderer.Initialise((uint)res.width, (uint)res.height);
 
         for (int i = 1; i < n; i++)
         {
@@ -52,7 +52,8 @@ internal class Program
             Hsl col = new((float)((double)(i - 1) / (n - 1) * 760) % 360, 1, 0.5f);
             var rgb = ColorSpaceConverter.ToRgb(col);
 
-            var shaded = renderer.RenderToImage(img, new Vector4(rgb.R, rgb.G, rgb.B, 1), roots);
+            renderer.Render(roots, new Vector4(rgb.R, rgb.G, rgb.B, 1), scale);
+            using var shaded = renderer.GetResult();
 
             img.Mutate(ctx => ctx.DrawImage(shaded, PixelColorBlendingMode.Add, 1)); // foreach (Complex root in roots
         }

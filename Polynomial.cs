@@ -33,7 +33,7 @@ public class Polynomial
     public Polynomial Derivative =>
         new Polynomial(
             Degree - 1,
-            [.. Coefficients.Slice(1, Coefficients.Count - 1).Select((c, i) => c * (i + 1))]
+            [.. Coefficients[1..].Select((c, i) => c * (i + 1))]
         );
 
     public (double upper, double lower) Bounds
@@ -43,8 +43,7 @@ public class Polynomial
             double upper =
                 1
                 + Coefficients
-                    .Select(c => (c / Coefficients[Coefficients.Count - 1]).Magnitude)
-                    .Max();
+                    .Max(c => (c / Coefficients[^1]).Magnitude);
             double lower = 1 / upper;
             return (upper, lower);
         }
@@ -55,20 +54,20 @@ public class Polynomial
         double goldenRatio = (1d + Math.Sqrt(5d)) / 2d;
         return
         [
-            .. (
+            ..
                 from i in Enumerable.Range(0, n)
                 let t = (double)i / n
-                let r = Math.Sqrt(t * (rMax * rMax - rMin * rMin) + rMin * rMin)
+                let r = Math.Sqrt((t * ((rMax * rMax) - (rMin * rMin))) + (rMin * rMin))
                 let theta = 2d * Math.PI * i / goldenRatio
                 select new Complex(r * Math.Cos(theta), r * Math.Sin(theta))
-            ),
+            ,
         ];
     }
 
     public List<Complex> GetRootsAberth(int maxIterations = 100000, double threshold = 0.001)
     {
-        (double upper, double lower) bounds = Bounds;
-        List<Complex> roots = fibonacciAnnulus(Degree, bounds.lower, bounds.upper);
+        (double upper, double lower) = Bounds;
+        List<Complex> roots = fibonacciAnnulus(Degree, lower, upper);
         Polynomial derivative = Derivative;
 
         for (int i = 0; i < maxIterations; i++)
@@ -78,7 +77,7 @@ public class Polynomial
             for (int k = 0; k < Degree; k++)
             {
                 Complex zk = roots[k];
-                Complex thisOverDerivative = (Evaluate(zk) / derivative.Evaluate(zk));
+                Complex thisOverDerivative = Evaluate(zk) / derivative.Evaluate(zk);
 
                 Complex sum = Complex.Zero;
                 for (int j = 0; j < Degree; j++)
