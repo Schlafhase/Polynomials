@@ -30,6 +30,7 @@ internal class Program
 
         using GLComputeRenderer renderer = new();
         renderer.Initialise((uint)res.width, (uint)res.height);
+        renderer.ClearOutput();
 
         for (int i = 1; i < n; i++)
         {

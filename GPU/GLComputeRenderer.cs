@@ -29,7 +29,7 @@ public class GLComputeRenderer : IDisposable
             ContextAPI.OpenGL,
             ContextProfile.Core,
             ContextFlags.Default,
-            new APIVersion(3, 3)
+            new APIVersion(4, 3)
         );
 
         window = Window.Create(opts);
@@ -38,6 +38,7 @@ public class GLComputeRenderer : IDisposable
 
         const string computeShaderSource =
             @"
+#[compute]
 #version 430 core
 layout(local_size_x = 16, local_size_y = 16) in;
 
@@ -59,9 +60,11 @@ uniform float scale;
 void main() {
     ivec2 pixel = ivec2(gl_GlobalInvocationID.xy);
     
+    imageStore(outputImage, pixel, vec4(1.));
     if (pixel.x >= int(resolution.x) || pixel.y >= int(resolution.y))
         return;
-    
+
+    return;
     // Convert pixel to UV coordinates
     vec2 uv = vec2(pixel) / resolution.y;
     uv = (uv - vec2(0.5 * resolution.x / resolution.y, 0.5)) * 2.0;
@@ -104,6 +107,24 @@ void main() {
         {
             string log = gl.GetProgramInfoLog(computeProgram);
             throw new Exception($"Compute program linking failed: {log}");
+        }
+        gl.GetProgram(computeProgram, ProgramPropertyARB.ActiveUniforms, out int uniformCount);
+        Console.WriteLine($"=== Active Uniforms ({uniformCount}) ===");
+
+        for (uint i = 0; i < uniformCount; i++)
+        {
+            gl.GetActiveUniform(
+                computeProgram,
+                i,
+                256,
+                out uint length,
+                out int size,
+                out GLEnum type,
+                out string name
+            );
+
+            int location = gl.GetUniformLocation(computeProgram, name);
+            Console.WriteLine($"Uniform {i}: {name} (type: {type}, size: {size}, location: {location})");
         }
 
         gl.DeleteShader(computeShader);
@@ -201,6 +222,12 @@ void main() {
 
         int scaleLoc = gl.GetUniformLocation(computeProgram, "scale");
         gl.Uniform1(scaleLoc, (float)scale);
+        Console.WriteLine($"Uniform locations: rootCount={rootCountLoc}, colour={colourLoc}, resolution={resolutionLoc}, scale={scaleLoc}");
+
+        if (resolutionLoc < 0)
+        {
+            Console.WriteLine("ERROR: resolution uniform not found!");
+        }
 
         // Dispatch compute shader
         // Work groups of 16x16, so divide by 16 and round up
