@@ -1,6 +1,6 @@
 ﻿using System.Numerics;
+using Microsoft.Extensions.Logging;
 using Polynomials.GPU;
-using ScottPlot;
 using SixLabors.ImageSharp;
 using SixLabors.ImageSharp.ColorSpaces;
 using SixLabors.ImageSharp.ColorSpaces.Conversion;
@@ -12,7 +12,6 @@ namespace Polynomials;
 
 internal class Program
 {
-    private static string _shaderSource = File.ReadAllText("createImage.frag");
 
     public static void Main(string[] args)
     {
@@ -25,10 +24,15 @@ internal class Program
         (int width, int height) HD = new(1920, 1080);
         (int width, int height) low = new(720, 480);
         (int width, int height) res = fourK;
-        SixLabors.ImageSharp.Image<Rgba32> img = new Image<Rgba32>(res.width, res.height);
-        img.Mutate(x => x.Fill(SixLabors.ImageSharp.Color.Black));
+        Image<Rgba32> img = new Image<Rgba32>(res.width, res.height);
+        img.Mutate(x => x.Fill(Color.Black));
+
 
         using GLComputeRenderer renderer = new();
+        using (ILoggerFactory factory = LoggerFactory.Create(builder => builder.AddConsole().SetMinimumLevel(LogLevel.Debug)))
+        {
+            renderer.Logger = factory.CreateLogger<GLComputeRenderer>();
+        }
         renderer.Initialise((uint)res.width, (uint)res.height);
         renderer.ClearOutput();
 
@@ -56,7 +60,7 @@ internal class Program
             renderer.Render(roots, new Vector4(rgb.R, rgb.G, rgb.B, 1), scale);
             using var shaded = renderer.GetResult();
 
-            img.Mutate(ctx => ctx.DrawImage(shaded, PixelColorBlendingMode.Add, 1)); // foreach (Complex root in roots
+            img.Mutate(ctx => ctx.DrawImage(shaded, PixelColorBlendingMode.Add, 1));
         }
         img.Save("out.png");
     }

@@ -1,4 +1,5 @@
 using System.Numerics;
+using Microsoft.Extensions.Logging;
 using Silk.NET.Maths;
 using Silk.NET.OpenGL;
 using Silk.NET.Windowing;
@@ -11,11 +12,13 @@ namespace Polynomials.GPU;
 public class GLComputeRenderer : IDisposable
 {
     private IWindow? window;
-    private GL gl;
+    private GL? gl;
     private uint computeProgram;
     private uint outputTexture;
     private uint rootBuffer;
+    private uint parameterBuffer;
     private uint width, height;
+    public ILogger? Logger;
 
     public void Initialise(uint width, uint height)
     {
@@ -52,19 +55,19 @@ layout(std430, binding = 1) buffer RootBuffer {
     Root roots[];
 };
 
-uniform int rootCount;
-uniform vec4 currentColour;
-uniform vec2 resolution;
-uniform float scale;
+layout(std140, binding = 2) uniform Parameters {
+    vec2 resolution;
+    vec4 currentColour;
+    float scale;
+    int rootCount;
+};
 
 void main() {
     ivec2 pixel = ivec2(gl_GlobalInvocationID.xy);
     
-    imageStore(outputImage, pixel, vec4(1.));
     if (pixel.x >= int(resolution.x) || pixel.y >= int(resolution.y))
         return;
 
-    return;
     // Convert pixel to UV coordinates
     vec2 uv = vec2(pixel) / resolution.y;
     uv = (uv - vec2(0.5 * resolution.x / resolution.y, 0.5)) * 2.0;
@@ -78,11 +81,10 @@ void main() {
     }
     
     // Calculate intensity
-    float intensity = 0.01 / (minDist + 0.01);
-    intensity = clamp(intensity, 0.0, 1.0);
+    float intensity = 1. / (50.*minDist);
     
     // Read existing colour and accumulate
-    vec4 newColour = vec4(currentColour.rgb * intensity, 1.0);
+    vec4 newColour = vec4(currentColour.rgb * intensity / 14, 1.0);
     imageStore(outputImage, pixel, newColour);
 }
 ";
@@ -109,7 +111,7 @@ void main() {
             throw new Exception($"Compute program linking failed: {log}");
         }
         gl.GetProgram(computeProgram, ProgramPropertyARB.ActiveUniforms, out int uniformCount);
-        Console.WriteLine($"=== Active Uniforms ({uniformCount}) ===");
+        Logger?.LogDebug("=== Active Uniforms ({}) ===", uniformCount);
 
         for (uint i = 0; i < uniformCount; i++)
         {
@@ -117,14 +119,14 @@ void main() {
                 computeProgram,
                 i,
                 256,
-                out uint length,
+                out _,
                 out int size,
                 out GLEnum type,
                 out string name
             );
 
             int location = gl.GetUniformLocation(computeProgram, name);
-            Console.WriteLine($"Uniform {i}: {name} (type: {type}, size: {size}, location: {location})");
+            Logger?.LogDebug("Uniform {}: {} (type: {}, size: {}, location: {})", i, name, type, size, location);
         }
 
         gl.DeleteShader(computeShader);
@@ -159,7 +161,9 @@ void main() {
             (int)GLEnum.Nearest
         );
 
-        Console.WriteLine("✓ Compute shader initialized");
+        parameterBuffer = gl.GenBuffer();
+
+        Logger?.LogInformation("✓ Compute shader initialized");
     }
 
     public unsafe void Render(List<Complex> roots, Vector4 colour, double scale)
@@ -167,7 +171,7 @@ void main() {
         if (gl == null)
             throw new InvalidOperationException("Not initialized");
 
-        Console.WriteLine($"Dispatching compute shader with {roots.Count} roots...");
+        Logger?.LogInformation("Dispatching compute shader with {} roots...", roots.Count);
 
         // Create SSBO for roots
         if (rootBuffer != 0)
@@ -210,24 +214,30 @@ void main() {
         // Bind root buffer
         gl.BindBufferBase(BufferTargetARB.ShaderStorageBuffer, 1, rootBuffer);
 
-        // Set uniforms
-        int rootCountLoc = gl.GetUniformLocation(computeProgram, "rootCount");
-        gl.Uniform1(rootCountLoc, roots.Count);
+        float[] paramData = new float[10];
+        paramData[0] = width;
+        paramData[1] = height;
+        paramData[4] = colour.X;
+        paramData[5] = colour.Y;
+        paramData[6] = colour.Z;
+        paramData[7] = colour.W;
+        paramData[8] = (float)scale;
+        paramData[9] = BitConverter.Int32BitsToSingle(roots.Count);
 
-        int colourLoc = gl.GetUniformLocation(computeProgram, "currentColour");
-        gl.Uniform4(colourLoc, colour.X, colour.Y, colour.Z, colour.W);
-
-        int resolutionLoc = gl.GetUniformLocation(computeProgram, "resolution");
-        gl.Uniform2(resolutionLoc, width, height);
-
-        int scaleLoc = gl.GetUniformLocation(computeProgram, "scale");
-        gl.Uniform1(scaleLoc, (float)scale);
-        Console.WriteLine($"Uniform locations: rootCount={rootCountLoc}, colour={colourLoc}, resolution={resolutionLoc}, scale={scaleLoc}");
-
-        if (resolutionLoc < 0)
+        gl.BindBuffer(BufferTargetARB.UniformBuffer, parameterBuffer);
+        fixed (float* ptr = paramData)
         {
-            Console.WriteLine("ERROR: resolution uniform not found!");
+            gl.BufferData(
+                    BufferTargetARB.UniformBuffer,
+                    (nuint)(paramData.Length * sizeof(float)),
+                    ptr,
+                    BufferUsageARB.DynamicDraw
+                );
         }
+
+        gl.BindBufferBase(BufferTargetARB.UniformBuffer, 2, parameterBuffer);
+        gl.BindBuffer(BufferTargetARB.UniformBuffer, 0);
+
 
         // Dispatch compute shader
         // Work groups of 16x16, so divide by 16 and round up
@@ -242,11 +252,16 @@ void main() {
         gl.Finish(); // Ensure GPU completes
         sw.Stop();
 
-        Console.WriteLine($"Compute shader completed in {sw.ElapsedMilliseconds}ms");
+        Logger?.LogInformation("Compute shader completed in {}ms", sw.ElapsedMilliseconds);
     }
 
     public Image<Rgba32> GetResult()
     {
+        if (gl is null)
+        {
+            throw new InvalidOperationException("Renderer wasn't initialised");
+        }
+
         byte[] pixelData = new byte[width * height * 4 * 4]; // RGBA32F = 16 bytes per pixel
 
         gl.BindTexture(TextureTarget.Texture2D, outputTexture);
@@ -281,6 +296,11 @@ void main() {
 
     public void ClearOutput()
     {
+        if (gl is null)
+        {
+            throw new InvalidOperationException("Renderer wasn't initialised");
+        }
+
         gl.BindTexture(TextureTarget.Texture2D, outputTexture);
 
         float[] clearData = new float[width * height * 4];
