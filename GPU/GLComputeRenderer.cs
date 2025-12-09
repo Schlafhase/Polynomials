@@ -1,8 +1,11 @@
 using System.Numerics;
+
 using Microsoft.Extensions.Logging;
+
 using Silk.NET.Maths;
 using Silk.NET.OpenGL;
 using Silk.NET.Windowing;
+
 using SixLabors.ImageSharp;
 using SixLabors.ImageSharp.PixelFormats;
 using SixLabors.ImageSharp.Processing;
@@ -25,7 +28,7 @@ public class GLComputeRenderer : IDisposable
         this.width = width;
         this.height = height;
         WindowOptions opts = WindowOptions.Default;
-        // opts.IsVisible = false;
+        opts.IsVisible = false;
         opts.Size = new Vector2D<int>((int)width, (int)height);
         opts.ShouldSwapAutomatically = false;
         opts.API = new GraphicsAPI(
