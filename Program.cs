@@ -1,6 +1,9 @@
 ﻿using System.Numerics;
+
 using Microsoft.Extensions.Logging;
+
 using Polynomials.GPU;
+
 using SixLabors.ImageSharp;
 using SixLabors.ImageSharp.ColorSpaces;
 using SixLabors.ImageSharp.ColorSpaces.Conversion;
@@ -15,7 +18,7 @@ internal class Program
 
     public static void Main(string[] args)
     {
-        createColouredImage(15, 2);
+        createColouredImage(15, 3);
     }
 
     private static void createColouredImage(int n, double scale)
@@ -54,7 +57,7 @@ internal class Program
                 }
             );
 
-            Hsl col = new((float)((double)(i - 1) / (n - 1) * 760) % 360, 1, 0.5f);
+            Hsl col = new((float)((double)(i - 1) / (n - 1) * 360 + 100) % 360, 0.5f, 0.3f);
             var rgb = ColorSpaceConverter.ToRgb(col);
 
             renderer.Render(roots, new Vector4(rgb.R, rgb.G, rgb.B, 1), scale);

@@ -88,7 +88,7 @@ public class Polynomial
                     }
                 }
 
-                offsets.Add(thisOverDerivative / (1 - thisOverDerivative * sum));
+                offsets.Add(thisOverDerivative / (1 - (thisOverDerivative * sum)));
             }
 
             for (int k = 0; k < Degree; k++)
@@ -96,7 +96,7 @@ public class Polynomial
                 roots[k] -= offsets[k];
             }
 
-            if (offsets.Select(o => o.Magnitude).Max() < threshold)
+            if (offsets.Max(o => o.Magnitude) < threshold)
             {
                 return roots;
             }
@@ -133,7 +133,7 @@ public class Polynomial
 
     public static IEnumerable<Polynomial> Littlewood(int n)
     {
-        List<Complex> choices = [new Complex(-1, 0), new Complex(1, 0)];
+        List<Complex> choices = [new Complex(-1, 0), new Complex(0.25, 1.7)];
 
         return cartesian(Enumerable.Repeat(choices, n + 1))
             .Select(coeffs => new Polynomial(n, [.. coeffs]));
