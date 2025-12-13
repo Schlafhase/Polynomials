@@ -27,11 +27,11 @@ public class Polynomial
         return Coefficients
             .AsEnumerable()
             .Reverse()
-            .Aggregate((result, coeff) => result * x + coeff);
+            .Aggregate((result, coeff) => (result * x) + coeff);
     }
 
     public Polynomial Derivative =>
-        new Polynomial(
+        new(
             Degree - 1,
             [.. Coefficients[1..].Select((c, i) => c * (i + 1))]
         );

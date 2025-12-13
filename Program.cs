@@ -16,7 +16,7 @@ namespace Polynomials;
 internal static class Program
 {
 
-    public static void Main(string[] args)
+    public static void Main()
     {
         createColouredImage(17, 2.4);
     }
@@ -27,7 +27,7 @@ internal static class Program
         (int width, int height) HD = new(1920, 1920);
         (int width, int height) low = new(720, 720);
         (int width, int height) res = fourK;
-        Image<Rgba32> img = new Image<Rgba32>(res.width, res.height);
+        Image<Rgba32> img = new(res.width, res.height);
         img.Mutate(x => x.Fill(Color.Black));
 
 
@@ -57,7 +57,7 @@ internal static class Program
                 }
             );
 
-            Hsl col = new((float)((double)(i - 1) / (n - 1) * 360 + 100) % 360, 0.5f, 0.1f);
+            Hsl col = new((float)(((double)(i - 1) / (n - 1) * 360) + 100) % 360, 0.5f, 0.1f);
             var rgb = ColorSpaceConverter.ToRgb(col);
 
             renderer.Render(roots, new Vector4(rgb.R, rgb.G, rgb.B, 1), scale);
